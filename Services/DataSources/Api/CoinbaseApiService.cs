@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading.Tasks;
+﻿using System.Net.Http.Headers;
 using CryptoMonitor.Core.Interfaces.DataSources;
 using CryptoMonitor.Core.Models.Coinbase;
 using CryptoMonitor.Utilities.Resilience;
@@ -22,6 +19,9 @@ namespace CryptoMonitor.Services.DataSources.Api
         {
             _httpClient = httpClient ?? new HttpClient();
             _logger = logger;
+
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "CryptoMonitor/1.0");
+            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
         public async Task<List<CoinbaseProduct>> GetTokensAsync()
@@ -32,6 +32,8 @@ namespace CryptoMonitor.Services.DataSources.Api
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, CoinbaseProductsUrl);
                 var response = await _httpClient.SendWithRetryAsync(request, logger: _logger);
+
+                _logger.LogInformation($"Received response with status: {response.StatusCode}");
 
                 response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync();
@@ -44,6 +46,7 @@ namespace CryptoMonitor.Services.DataSources.Api
                 }
                 catch
                 {
+                    _logger.LogInformation("Attempting to parse as wrapped response");
                     var apiResponse = JsonConvert.DeserializeObject<CoinbaseApiResponse>(content);
                     var products = apiResponse?.Data ?? new List<CoinbaseProduct>();
                     _logger.LogInformation($"Found {products.Count} products on Coinbase (from wrapped response)");

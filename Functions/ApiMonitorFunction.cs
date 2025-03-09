@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using CryptoMonitor.Configuration;
 using CryptoMonitor.Core.Interfaces.Configuration;
 using CryptoMonitor.Core.Interfaces.DataSources;
 using CryptoMonitor.Core.Models.Coinbase;
