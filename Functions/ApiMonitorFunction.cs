@@ -37,7 +37,7 @@ namespace CryptoMonitor
         }
 
         [Function("ApiMonitorFunction")]
-        public async Task Run([TimerTrigger("0 */1 * * * *")] TimerInfo timer)
+        public async Task Run([TimerTrigger("0 */3 * * * *")] TimerInfo timer)
         {
             _logger.LogInformation($"Crypto API monitoring function executed at: {DateTime.Now}");
 
