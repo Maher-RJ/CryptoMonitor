@@ -1,6 +1,7 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using CryptoMonitor.Configuration;
 using CryptoMonitor.Core.Interfaces.Configuration;
 using CryptoMonitor.Core.Interfaces.DataSources;
@@ -29,6 +30,19 @@ var host = new HostBuilder()
 
         // Register notification
         services.AddSingleton<NotificationFactory>();
+    })
+
+    .ConfigureLogging(logging =>
+    {
+        logging.Services.Configure<LoggerFilterOptions>(options =>
+        {
+            var rule = options.Rules.FirstOrDefault(rule => rule.ProviderName
+                == "Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider");
+            if (rule is not null)
+            {
+                options.Rules.Remove(rule);
+            }
+        });
     })
     .Build();
 
