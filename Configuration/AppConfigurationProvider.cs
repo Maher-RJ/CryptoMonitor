@@ -1,7 +1,6 @@
 ﻿using System;
 using CryptoMonitor.Configuration.Models;
 using CryptoMonitor.Core.Interfaces.Configuration;
-using CryptoMonitor.Services.DataSources.Api;
 using Microsoft.Extensions.Logging;
 
 namespace CryptoMonitor.Configuration
@@ -28,6 +27,14 @@ namespace CryptoMonitor.Configuration
 
             try
             {
+                // Application mode
+                settings.TestMode = GetBoolSetting("TestMode", false);
+
+                // Storage settings (just logging them, they're used directly in BlobTokenRepository)
+                var prodContainer = GetStringSetting("ProductionContainerName", "crypto-data");
+                var testContainer = GetStringSetting("TestContainerName", "crypto-data-test");
+                _logger.LogInformation($"Storage containers configured: Production={prodContainer}, Test={testContainer}");
+
                 // Coinbase settings
                 settings.DataSources.Coinbase.Enabled = GetBoolSetting("DataSources:Coinbase:Enabled", true);
                 settings.DataSources.Coinbase.ApiEnabled = GetBoolSetting("DataSources:Coinbase:ApiEnabled", true);

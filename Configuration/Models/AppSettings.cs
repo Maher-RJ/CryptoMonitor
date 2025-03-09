@@ -6,6 +6,7 @@ namespace CryptoMonitor.Configuration.Models
     {
         public DataSourceSettings DataSources { get; set; } = new DataSourceSettings();
         public NotificationSettings Notifications { get; set; } = new NotificationSettings();
+        public bool TestMode { get; set; } = false;
     }
 
     public class DataSourceSettings

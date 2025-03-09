@@ -6,7 +6,7 @@ using Azure;
 using Azure.Communication.Email;
 using CryptoMonitor.Core.Interfaces.Notification;
 using CryptoMonitor.Core.Models.Coinbase;
-using CryptoMonitor.Services.DataSources.Api;
+using CryptoMonitor.Core.Models.Common;
 using Microsoft.Extensions.Logging;
 
 namespace CryptoMonitor.Services.Notification
@@ -62,8 +62,24 @@ namespace CryptoMonitor.Services.Notification
                 bodyBuilder.AppendLine($"<p>The following {items.Count} new tokens were detected on {source}:</p>");
                 bodyBuilder.AppendLine("<table border='1' cellpadding='5'>");
 
-                // Special handling for CoinbaseProduct
-                if (typeof(T) == typeof(CoinbaseProduct))
+                // Special handling for Token model
+                if (typeof(T) == typeof(Token))
+                {
+                    bodyBuilder.AppendLine("<tr><th>Trading Pair</th><th>Symbol</th></tr>");
+
+                    foreach (var item in items)
+                    {
+                        if (item is Token token)
+                        {
+                            bodyBuilder.AppendLine($"<tr>" +
+                                $"<td>{token.Id}</td>" +
+                                $"<td>{token.Symbol}</td>" +
+                                $"</tr>");
+                        }
+                    }
+                }
+                // Backward compatibility for CoinbaseProduct
+                else if (typeof(T) == typeof(CoinbaseProduct))
                 {
                     bodyBuilder.AppendLine("<tr><th>Token</th><th>Trading Pair</th></tr>");
 
@@ -87,6 +103,7 @@ namespace CryptoMonitor.Services.Notification
 
                 bodyBuilder.AppendLine("</table>");
                 bodyBuilder.AppendLine("<p>These tokens may present trading opportunities.</p>");
+                bodyBuilder.AppendLine("<p>This notification was sent automatically by the CryptoMonitor system.</p>");
                 bodyBuilder.AppendLine("</body></html>");
 
                 string htmlContent = bodyBuilder.ToString();

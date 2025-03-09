@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using CryptoMonitor.Core.Models.Common;
 
 namespace CryptoMonitor.Core.Interfaces.Storage
 {
-    public interface ITokenRepository<T>
+    public interface ITokenRepository
     {
-        Task<List<T>> GetPreviousTokensAsync(string source);
-        Task SaveTokensAsync(List<T> tokens, string source);
+        Task<List<Token>> GetPreviousTokensAsync(string source);
+        Task SaveTokensAsync(List<Token> tokens, string source);
     }
 }

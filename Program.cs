@@ -8,6 +8,7 @@ using CryptoMonitor.Core.Interfaces.DataSources;
 using CryptoMonitor.Core.Interfaces.Storage;
 using CryptoMonitor.Core.Models.Coinbase;
 using CryptoMonitor.Services.DataSources.Api;
+using CryptoMonitor.Services.Mapping;
 using CryptoMonitor.Services.Notification;
 using CryptoMonitor.Services.Storage;
 
@@ -24,9 +25,12 @@ var host = new HostBuilder()
         // Register configuration
         services.AddSingleton<IConfigurationProvider, AppConfigurationProvider>();
 
-        // Register services
-        services.AddSingleton<ITokenProvider<CoinbaseProduct>, CoinbaseApiService>();
-        services.AddSingleton<ITokenRepository<CoinbaseProduct>, BlobTokenRepository>();
+        // Register mappers
+        services.AddSingleton<IExchangeMapper<CoinbaseProduct>, CoinbaseMapper>();
+
+        // Register services with updated interfaces
+        services.AddSingleton<ITokenProvider, CoinbaseApiService>();
+        services.AddSingleton<ITokenRepository, BlobTokenRepository>();
 
         // Register notification
         services.AddSingleton<NotificationFactory>();
