@@ -11,12 +11,12 @@ namespace CryptoMonitor.Services.Notification
     {
         private readonly IConfigurationProvider _configProvider;
         private readonly ILogger<NotificationFactory> _logger;
-        private readonly ILoggerFactory _loggerFactory;  // Add this to create loggers for other services
+        private readonly ILoggerFactory _loggerFactory;
 
         public NotificationFactory(
             IConfigurationProvider configProvider,
             ILogger<NotificationFactory> logger,
-            ILoggerFactory loggerFactory)  // Inject the logger factory
+            ILoggerFactory loggerFactory)
         {
             _configProvider = configProvider;
             _logger = logger;
@@ -35,11 +35,6 @@ namespace CryptoMonitor.Services.Notification
             }
 
             // Phone notifications are not yet implemented
-            // if (settings.Notifications.Phone.Enabled)
-            // {
-            //     var phoneLogger = _loggerFactory.CreateLogger<PhoneCallService>();
-            //     yield return new PhoneCallService(phoneLogger);
-            // }
         }
     }
 }

@@ -161,8 +161,6 @@ namespace CryptoMonitor.Utilities.Html
             if (percentChange > thresholdPercent)
                 return true;
 
-            // Could implement more sophisticated diff algorithm here if needed
-
             return false;
         }
 

@@ -29,7 +29,7 @@ namespace CryptoMonitor.Services.Notification
             string connectionString = Environment.GetEnvironmentVariable("AzureCommunicationServicesConnectionString");
             _senderAddress = Environment.GetEnvironmentVariable("EmailSenderAddress");
             _recipientAddress = Environment.GetEnvironmentVariable("EmailRecipientAddress");
-            _isEnabled = bool.TryParse(Environment.GetEnvironmentVariable("Notifications:Email:Enabled") ?? "true", out bool enabled) && enabled;
+            _isEnabled = bool.TryParse(Environment.GetEnvironmentVariable("NotificationsEmailEnabled") ?? "true", out bool enabled) && enabled;
 
             if (string.IsNullOrEmpty(connectionString))
             {

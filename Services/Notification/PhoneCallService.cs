@@ -22,13 +22,12 @@ namespace CryptoMonitor.Services.Notification
             _fromNumber = Environment.GetEnvironmentVariable("PhoneFromNumber");
             _toNumber = Environment.GetEnvironmentVariable("PhoneToNumber");
             _connectionString = Environment.GetEnvironmentVariable("PhoneConnectionString");
-            _isEnabled = bool.TryParse(Environment.GetEnvironmentVariable("Notifications:Phone:Enabled") ?? "false", out bool enabled) && enabled;
+            _isEnabled = bool.TryParse(Environment.GetEnvironmentVariable("NotificationsPhoneEnabled") ?? "false", out bool enabled) && enabled;
         }
 
         public async Task SendNotificationAsync<T>(string subject, List<T> items, string source)
         {
             // TODO: Implement phone call notification logic
-            // This is a placeholder for future implementation
             _logger.LogInformation("PhoneCallService is not yet implemented");
             await Task.CompletedTask;
         }

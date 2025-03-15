@@ -37,48 +37,42 @@ namespace CryptoMonitor.Configuration
                 _logger.LogInformation($"Storage containers configured: Production={prodContainer}, Test={testContainer}");
 
                 // Global API monitoring settings
-                settings.ApiMonitoring.Enabled = GetBoolSetting("ApiMonitoring:Enabled", true);
-                settings.ApiMonitoring.CheckIntervalMinutes = GetIntSetting("ApiMonitoring:CheckIntervalMinutes", 3);
-                _logger.LogInformation($"API monitoring configured: Enabled={settings.ApiMonitoring.Enabled}, Interval={settings.ApiMonitoring.CheckIntervalMinutes} minutes");
+                settings.ApiMonitoring.Enabled = GetBoolSetting("ApiMonitoringEnabled", true);
+                _logger.LogInformation($"API monitoring configured: Enabled={settings.ApiMonitoring.Enabled}");
 
                 // Global blog monitoring settings
-                settings.BlogMonitoring.Enabled = GetBoolSetting("BlogMonitoring:Enabled", true);
-                settings.BlogMonitoring.CheckIntervalMinutes = GetIntSetting("BlogMonitoring:CheckIntervalMinutes", 5);
-                _logger.LogInformation($"Blog monitoring configured: Enabled={settings.BlogMonitoring.Enabled}, Interval={settings.BlogMonitoring.CheckIntervalMinutes} minutes");
+                settings.BlogMonitoring.Enabled = GetBoolSetting("BlogMonitoringEnabled", true);
+                _logger.LogInformation($"Blog monitoring configured: Enabled={settings.BlogMonitoring.Enabled}");
 
                 // Web scraping settings
-                settings.WebScraping.Enabled = GetBoolSetting("WebScraping:Enabled", true);
+                settings.WebScraping.Enabled = GetBoolSetting("WebScrapingEnabled", true);
                 LoadWebScrapingPages(settings.WebScraping);
                 _logger.LogInformation($"Web scraping configured: Enabled={settings.WebScraping.Enabled}, Pages={settings.WebScraping.Pages.Count}");
 
                 // Coinbase settings
-                settings.DataSources.Coinbase.Enabled = GetBoolSetting("DataSources:Coinbase:Enabled", true);
-                settings.DataSources.Coinbase.ApiEnabled = GetBoolSetting("DataSources:Coinbase:ApiEnabled", true);
-                settings.DataSources.Coinbase.BlogEnabled = GetBoolSetting("DataSources:Coinbase:BlogEnabled", false);
-                settings.DataSources.Coinbase.ApiCheckIntervalMinutes = GetIntSetting("DataSources:Coinbase:ApiCheckIntervalMinutes", 5);
-                settings.DataSources.Coinbase.BlogCheckIntervalMinutes = GetIntSetting("DataSources:Coinbase:BlogCheckIntervalMinutes", 60);
-                settings.DataSources.Coinbase.ApiUrl = GetStringSetting("DataSources:Coinbase:ApiUrl", "https://api.exchange.coinbase.com/products");
-                settings.DataSources.Coinbase.BlogUrl = GetStringSetting("DataSources:Coinbase:BlogUrl", "https://blog.coinbase.com");
-                settings.DataSources.Coinbase.RoadmapUrl = GetStringSetting("DataSources:Coinbase:RoadmapUrl",
+                settings.DataSources.Coinbase.Enabled = GetBoolSetting("DataSourcesCoinbaseEnabled", true);
+                settings.DataSources.Coinbase.ApiEnabled = GetBoolSetting("DataSourcesCoinbaseApiEnabled", true);
+                settings.DataSources.Coinbase.BlogEnabled = GetBoolSetting("DataSourcesCoinbaseBlogEnabled", false);
+                settings.DataSources.Coinbase.ApiUrl = GetStringSetting("DataSourcesCoinbaseApiUrl", "https://api.exchange.coinbase.com/products");
+                settings.DataSources.Coinbase.BlogUrl = GetStringSetting("DataSourcesCoinbaseBlogUrl", "https://blog.coinbase.com");
+                settings.DataSources.Coinbase.RoadmapUrl = GetStringSetting("DataSourcesCoinbaseRoadmapUrl",
                     "https://www.coinbase.com/blog/increasing-transparency-for-new-asset-listings-on-coinbase");
 
                 // Robinhood settings
-                settings.DataSources.Robinhood.Enabled = GetBoolSetting("DataSources:Robinhood:Enabled", false);
-                settings.DataSources.Robinhood.ApiEnabled = GetBoolSetting("DataSources:Robinhood:ApiEnabled", false);
-                settings.DataSources.Robinhood.BlogEnabled = GetBoolSetting("DataSources:Robinhood:BlogEnabled", false);
-                settings.DataSources.Robinhood.ApiCheckIntervalMinutes = GetIntSetting("DataSources:Robinhood:ApiCheckIntervalMinutes", 5);
-                settings.DataSources.Robinhood.BlogCheckIntervalMinutes = GetIntSetting("DataSources:Robinhood:BlogCheckIntervalMinutes", 60);
-                settings.DataSources.Robinhood.BlogUrl = GetStringSetting("DataSources:Robinhood:BlogUrl", "");
-                settings.DataSources.Robinhood.RoadmapUrl = GetStringSetting("DataSources:Robinhood:RoadmapUrl", "");
+                settings.DataSources.Robinhood.Enabled = GetBoolSetting("DataSourcesRobinhoodEnabled", false);
+                settings.DataSources.Robinhood.ApiEnabled = GetBoolSetting("DataSourcesRobinhoodApiEnabled", false);
+                settings.DataSources.Robinhood.BlogEnabled = GetBoolSetting("DataSourcesRobinhoodBlogEnabled", false);
+                settings.DataSources.Robinhood.BlogUrl = GetStringSetting("DataSourcesRobinhoodBlogUrl", "");
+                settings.DataSources.Robinhood.RoadmapUrl = GetStringSetting("DataSourcesRobinhoodRoadmapUrl", "");
 
                 // Email notification settings
-                settings.Notifications.Email.Enabled = GetBoolSetting("Notifications:Email:Enabled", true);
+                settings.Notifications.Email.Enabled = GetBoolSetting("NotificationsEmailEnabled", true);
                 settings.Notifications.Email.SenderAddress = GetStringSetting("EmailSenderAddress", "");
                 settings.Notifications.Email.RecipientAddress = GetStringSetting("EmailRecipientAddress", "");
                 settings.Notifications.Email.ConnectionString = GetStringSetting("AzureCommunicationServicesConnectionString", "");
 
                 // Phone notification settings
-                settings.Notifications.Phone.Enabled = GetBoolSetting("Notifications:Phone:Enabled", false);
+                settings.Notifications.Phone.Enabled = GetBoolSetting("NotificationsPhoneEnabled", false);
                 settings.Notifications.Phone.FromNumber = GetStringSetting("PhoneFromNumber", "");
                 settings.Notifications.Phone.ToNumber = GetStringSetting("PhoneToNumber", "");
                 settings.Notifications.Phone.ConnectionString = GetStringSetting("PhoneConnectionString", "");
@@ -92,7 +86,6 @@ namespace CryptoMonitor.Configuration
                         Url = settings.DataSources.Coinbase.RoadmapUrl,
                         Source = "CoinbaseBlog",
                         ParserType = "CoinbaseRoadmap",
-                        CheckIntervalMinutes = settings.DataSources.Coinbase.BlogCheckIntervalMinutes,
                         Enabled = true
                     });
                 }
@@ -113,23 +106,21 @@ namespace CryptoMonitor.Configuration
 
             while (true)
             {
-                string nameKey = $"WebScraping:Pages:{pageIndex}:Name";
+                string nameKey = $"WebScrapingPage{pageIndex}Name";
                 string name = GetStringSetting(nameKey, null);
 
                 if (string.IsNullOrEmpty(name))
                     break;
 
                 // Found a page configuration
-                string urlKey = $"WebScraping:Pages:{pageIndex}:Url";
-                string sourceKey = $"WebScraping:Pages:{pageIndex}:Source";
-                string parserTypeKey = $"WebScraping:Pages:{pageIndex}:ParserType";
-                string intervalKey = $"WebScraping:Pages:{pageIndex}:CheckIntervalMinutes";
-                string enabledKey = $"WebScraping:Pages:{pageIndex}:Enabled";
+                string urlKey = $"WebScrapingPage{pageIndex}Url";
+                string sourceKey = $"WebScrapingPage{pageIndex}Source";
+                string parserTypeKey = $"WebScrapingPage{pageIndex}ParserType";
+                string enabledKey = $"WebScrapingPage{pageIndex}Enabled";
 
                 string url = GetStringSetting(urlKey, "");
                 string source = GetStringSetting(sourceKey, "");
                 string parserType = GetStringSetting(parserTypeKey, "");
-                int interval = GetIntSetting(intervalKey, 5);
                 bool enabled = GetBoolSetting(enabledKey, true);
 
                 if (!string.IsNullOrEmpty(url))
@@ -140,7 +131,6 @@ namespace CryptoMonitor.Configuration
                         Url = url,
                         Source = source,
                         ParserType = parserType,
-                        CheckIntervalMinutes = interval,
                         Enabled = enabled
                     });
 
