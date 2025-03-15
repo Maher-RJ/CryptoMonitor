@@ -143,132 +143,40 @@ namespace CryptoMonitor.Services.Storage
             }
         }
 
-        public async Task<string> GetPreviousHtmlAsync(string source)
-        {
-            int retryCount = 0;
-
-            while (retryCount < MaxRetries)
-            {
-                try
-                {
-                    _logger.LogInformation($"Reading previously stored HTML for {source} from Azure Storage...");
-
-                    var containerClient = _blobServiceClient.GetBlobContainerClient(GetContainerName());
-                    await containerClient.CreateIfNotExistsAsync();
-
-                    string blobName = GetHtmlBlobName(source);
-                    var blobClient = containerClient.GetBlobClient(blobName);
-
-                    if (!await blobClient.ExistsAsync())
-                    {
-                        _logger.LogInformation($"No previous HTML found for {source}");
-                        return string.Empty;
-                    }
-
-                    var response = await blobClient.DownloadAsync();
-                    using var streamReader = new StreamReader(response.Value.Content);
-                    var html = await streamReader.ReadToEndAsync();
-
-                    _logger.LogInformation($"Successfully read HTML for {source}, content length: {html.Length} bytes");
-
-                    return html;
-                }
-                catch (RequestFailedException ex) when (ex.Status == 409)
-                {
-                    retryCount++;
-                    _logger.LogWarning($"Storage conflict detected when reading HTML. Retry {retryCount}/{MaxRetries}");
-
-                    if (retryCount >= MaxRetries)
-                        throw;
-
-                    int delayMs = (int)Math.Pow(2, retryCount) * 500;
-                    await Task.Delay(delayMs);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error reading HTML from Azure Storage for {source}: {ex.Message}");
-                    return string.Empty;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        public async Task SaveHtmlAsync(string htmlContent, string source)
-        {
-            int retryCount = 0;
-
-            while (retryCount < MaxRetries)
-            {
-                try
-                {
-                    var containerClient = _blobServiceClient.GetBlobContainerClient(GetContainerName());
-                    await containerClient.CreateIfNotExistsAsync();
-
-                    string blobName = GetHtmlBlobName(source);
-                    var blobClient = containerClient.GetBlobClient(blobName);
-
-                    using var stream = new MemoryStream(Encoding.UTF8.GetBytes(htmlContent));
-                    await blobClient.UploadAsync(stream, overwrite: true);
-
-                    _logger.LogInformation($"Successfully saved HTML for {source} to blob storage (length: {htmlContent.Length} bytes)");
-
-                    return;
-                }
-                catch (RequestFailedException ex) when (ex.Status == 409)
-                {
-                    retryCount++;
-                    _logger.LogWarning($"Storage conflict detected when saving HTML. Retry {retryCount}/{MaxRetries}");
-
-                    if (retryCount >= MaxRetries)
-                        throw;
-
-                    int delayMs = (int)Math.Pow(2, retryCount) * 500;
-                    await Task.Delay(delayMs);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error saving HTML to Azure Storage for {source}: {ex.Message}");
-                    return;
-                }
-            }
-        }
-
-        public async Task<(List<BlogToken> NewTokens, bool HtmlChanged)> GetChangesAsync(
+        public async Task<(List<BlogToken> NewTokens, List<BlogToken> RemovedTokens)> GetChangesAsync(
             List<BlogToken> currentTokens,
-            string currentHtml,
             string source)
         {
             var previousTokens = await GetPreviousTokensAsync(source);
-            var previousHtml = await GetPreviousHtmlAsync(source);
+
+            // First run detection
+            bool isFirstRun = previousTokens.Count == 0;
 
             // Find new tokens by comparison
             var newTokens = FindNewTokens(currentTokens, previousTokens);
 
-            // Simple HTML change detection
-            bool htmlChanged = false;
-            if (!string.IsNullOrEmpty(previousHtml) && !string.IsNullOrEmpty(currentHtml))
-            {
-                // Compare HTML length as simple change detection
-                // More sophisticated diff could be implemented
-                int lengthDiff = Math.Abs(currentHtml.Length - previousHtml.Length);
+            // Find removed tokens (tokens that were in previous list but not in current)
+            var removedTokens = FindRemovedTokens(currentTokens, previousTokens);
 
-                // If length changed by more than 0.5%, consider it changed
-                htmlChanged = lengthDiff > (currentHtml.Length * 0.005);
-
-                // Log the difference
-                if (htmlChanged)
-                {
-                    _logger.LogInformation($"HTML content changed for {source}. Size difference: {lengthDiff} bytes");
-                }
-            }
-            else if (string.IsNullOrEmpty(previousHtml) && !string.IsNullOrEmpty(currentHtml))
+            // Log token changes
+            if (newTokens.Count > 0)
             {
-                // First time we're getting HTML
-                htmlChanged = true;
+                _logger.LogInformation($"Found {newTokens.Count} new tokens for {source}");
             }
 
-            return (newTokens, htmlChanged);
+            if (removedTokens.Count > 0)
+            {
+                _logger.LogInformation($"Found {removedTokens.Count} tokens removed from {source} (potentially listed)");
+            }
+
+            // On first run, if we have current tokens, consider them all as "new" for notification purposes
+            if (isFirstRun && currentTokens.Count > 0 && newTokens.Count == 0)
+            {
+                _logger.LogInformation($"First run detected for {source}. Treating {currentTokens.Count} tokens as new for notification purposes.");
+                return (currentTokens, new List<BlogToken>());
+            }
+
+            return (newTokens, removedTokens);
         }
 
         private List<BlogToken> FindNewTokens(List<BlogToken> currentTokens, List<BlogToken> previousTokens)
@@ -281,14 +189,19 @@ namespace CryptoMonitor.Services.Storage
                 .ToList();
         }
 
+        private List<BlogToken> FindRemovedTokens(List<BlogToken> currentTokens, List<BlogToken> previousTokens)
+        {
+            return previousTokens
+                .Where(previous => !currentTokens.Any(current =>
+                    current.Symbol == previous.Symbol &&
+                    current.Network == previous.Network &&
+                    current.ContractAddress == previous.ContractAddress))
+                .ToList();
+        }
+
         private string GetTokensBlobName(string source)
         {
             return $"{source.ToLowerInvariant()}-blog-tokens.json";
-        }
-
-        private string GetHtmlBlobName(string source)
-        {
-            return $"{source.ToLowerInvariant()}-blog-latest.html";
         }
     }
 }

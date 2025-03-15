@@ -12,9 +12,9 @@ namespace CryptoMonitor.Services.WebScraping.Parsers
     {
         private readonly ILogger<CoinbaseRoadmapParser> _logger;
 
-        // Exact section identifiers from the HTML
-        private readonly string[] _ethereumIdentifiers = new[] {
-            "Assets on the Ethereum blockchain (ERC-20 tokens)",
+        // Partial section identifiers that could be fragmented across tags
+        private readonly string[] _ethereumPartialIdentifiers = new[] {
+            "Assets on the", "Ethereum", "blockchain (ERC-20 tokens)",
             "Assets on the Ethereum"
         };
 
@@ -45,32 +45,34 @@ namespace CryptoMonitor.Services.WebScraping.Parsers
 
             try
             {
-                // Extract Ethereum tokens
-                foreach (var identifier in _ethereumIdentifiers)
+                // Check for Ethereum section using a more flexible approach
+                if (ContainsAllEthereumIdentifiers(htmlContent))
                 {
-                    if (htmlContent.Contains(identifier))
+                    _logger.LogInformation("Found Ethereum section identifiers");
+
+                    // Find approximate position of Ethereum section
+                    int ethereumSectionStart = FindEthereumSectionStart(htmlContent);
+                    if (ethereumSectionStart >= 0)
                     {
-                        _logger.LogInformation($"Found Ethereum section: '{identifier}'");
-                        ExtractTokensFromSection(htmlContent, identifier, "Ethereum", tokens);
-                        break; // Only process the first matching identifier
+                        _logger.LogInformation($"Ethereum section starts around position {ethereumSectionStart}");
+                        ExtractTokensFromSection(htmlContent, ethereumSectionStart, "Ethereum", tokens);
                     }
                 }
 
-                // Extract Base network tokens
+                // Check for Base network section
                 foreach (var identifier in _baseIdentifiers)
                 {
                     if (htmlContent.Contains(identifier))
                     {
                         _logger.LogInformation($"Found Base network section: '{identifier}'");
-                        ExtractTokensFromSection(htmlContent, identifier, "Base", tokens);
-                        break; // Only process the first matching identifier
+                        ExtractTokensFromSection(htmlContent, htmlContent.IndexOf(identifier), "Base", tokens);
                     }
                 }
 
-                // If we didn't find any tokens using the section approach, try to extract from the entire document
+                // If no tokens found, try extracting from the entire document
                 if (tokens.Count == 0)
                 {
-                    _logger.LogInformation("No tokens found using section approach, trying to extract from entire document");
+                    _logger.LogInformation("No tokens found in sections, trying to extract from entire document");
                     ExtractTokensFromEntireDocument(htmlContent, tokens);
                 }
 
@@ -97,6 +99,51 @@ namespace CryptoMonitor.Services.WebScraping.Parsers
             return await Task.FromResult(tokens);
         }
 
+        // Check if all the necessary parts of Ethereum section are present
+        private bool ContainsAllEthereumIdentifiers(string html)
+        {
+            bool containsAssets = html.Contains("Assets on the");
+            bool containsEthereum = html.Contains("Ethereum");
+            bool containsBlockchain = html.Contains("blockchain (ERC-20 tokens)");
+
+            _logger.LogDebug($"Ethereum section checks: Assets={containsAssets}, Ethereum={containsEthereum}, Blockchain={containsBlockchain}");
+
+            return containsAssets && containsEthereum && containsBlockchain;
+        }
+
+        // Find the approximate start of the Ethereum section
+        private int FindEthereumSectionStart(string html)
+        {
+            // Look for the pattern that typically starts the Ethereum section
+            string[] patterns = {
+                "<b>Assets on the </b>",
+                "Assets on the Ethereum",
+                "Assets on the.*Ethereum"
+            };
+
+            foreach (string pattern in patterns)
+            {
+                var match = Regex.Match(html, pattern);
+                if (match.Success)
+                {
+                    return match.Index;
+                }
+            }
+
+            // Fallback: Just look for "Assets on the" near "Ethereum"
+            int assetsIndex = html.IndexOf("Assets on the");
+            if (assetsIndex >= 0)
+            {
+                string contextAfter = html.Substring(assetsIndex, Math.Min(200, html.Length - assetsIndex));
+                if (contextAfter.Contains("Ethereum"))
+                {
+                    return assetsIndex;
+                }
+            }
+
+            return -1;
+        }
+
         public bool IsHtmlChanged(string oldHtml, string newHtml)
         {
             if (string.IsNullOrEmpty(oldHtml) || string.IsNullOrEmpty(newHtml))
@@ -109,64 +156,113 @@ namespace CryptoMonitor.Services.WebScraping.Parsers
             return lengthDiff > (oldHtml.Length * 0.005);
         }
 
-        private void ExtractTokensFromSection(string html, string sectionIdentifier, string network, List<BlogToken> tokens)
+        private void ExtractTokensFromSection(string html, int sectionStart, string network, List<BlogToken> tokens)
         {
             try
             {
-                // Find the section
-                int sectionStart = html.IndexOf(sectionIdentifier);
                 if (sectionStart == -1)
                 {
-                    _logger.LogWarning($"Section '{sectionIdentifier}' not found in HTML");
+                    _logger.LogWarning($"Section start not found for {network}");
                     return;
                 }
 
                 // Look for the next section or the end of the document
-                int nextSection = int.MaxValue;
+                int nextSection = html.Length;
                 string[] nextSectionMarkers = { "Assets on the", "*This is not an exhaustive list" };
 
                 foreach (var marker in nextSectionMarkers)
                 {
-                    int markerIndex = html.IndexOf(marker, sectionStart + sectionIdentifier.Length);
+                    int markerIndex = html.IndexOf(marker, sectionStart + 50); // Add offset to avoid matching the current section
                     if (markerIndex > sectionStart && markerIndex < nextSection)
                     {
                         nextSection = markerIndex;
                     }
                 }
 
-                // If we didn't find a next section, use a reasonable chunk of HTML after the section
-                int sectionEnd = nextSection != int.MaxValue ? nextSection : sectionStart + 5000;
-
                 // Extract the section's HTML
+                int sectionEnd = Math.Min(nextSection, sectionStart + 10000);
                 string sectionHtml = html.Substring(sectionStart, sectionEnd - sectionStart);
 
-                // Pattern based on the exact format seen in the HTML: "Name (SYMBOL) - Contract address: 0x..."
-                string pattern = @"([a-zA-Z0-9\s]+)\s*\(([A-Z0-9]+)\)\s*-\s*Contract\s*address:\s*(0x[a-fA-F0-9]+)";
+                _logger.LogDebug($"Extracted {sectionHtml.Length} characters of HTML for {network} section");
 
-                MatchCollection matches = Regex.Matches(sectionHtml, pattern);
+                // Look for list items with tokens
+                string listItemPattern = @"<li[^>]*>.*?<p[^>]*>([^<]*\([A-Z0-9]+\)[^<]*Contract\s+address:\s+0x[a-fA-F0-9]+[^<]*)</p>";
+                var listItemMatches = Regex.Matches(sectionHtml, listItemPattern, RegexOptions.Singleline);
 
-                foreach (Match match in matches)
+                _logger.LogDebug($"Found {listItemMatches.Count} list items in {network} section");
+
+                foreach (Match match in listItemMatches)
                 {
-                    if (match.Groups.Count >= 4)
+                    if (match.Groups.Count >= 2)
                     {
-                        string name = match.Groups[1].Value.Trim();
-                        string symbol = match.Groups[2].Value.Trim();
-                        string contractAddress = match.Groups[3].Value.Trim();
+                        string content = match.Groups[1].Value;
 
-                        tokens.Add(new BlogToken
+                        // Extract the token information using a simpler pattern
+                        var tokenMatch = Regex.Match(content, @"([a-zA-Z0-9\s]+)\s*\(([A-Z0-9]+)\)\s*-\s*Contract\s+address:\s+(0x[a-fA-F0-9]+)");
+
+                        if (tokenMatch.Success && tokenMatch.Groups.Count >= 4)
                         {
-                            Name = name,
-                            Symbol = symbol,
-                            ContractAddress = contractAddress,
-                            Network = network,
-                            DiscoveredAt = DateTime.UtcNow
-                        });
+                            string name = tokenMatch.Groups[1].Value.Trim();
+                            string symbol = tokenMatch.Groups[2].Value.Trim();
+                            string contractAddress = tokenMatch.Groups[3].Value.Trim();
 
-                        _logger.LogDebug($"Extracted token from section: {name} ({symbol}) on {network}");
+                            // Skip if already in our list
+                            if (tokens.Exists(t => t.Symbol == symbol && t.ContractAddress == contractAddress))
+                            {
+                                continue;
+                            }
+
+                            tokens.Add(new BlogToken
+                            {
+                                Name = name,
+                                Symbol = symbol,
+                                ContractAddress = contractAddress,
+                                Network = network,
+                                DiscoveredAt = DateTime.UtcNow
+                            });
+
+                            _logger.LogDebug($"Extracted token: {name} ({symbol}) on {network}");
+                        }
                     }
                 }
 
-                _logger.LogInformation($"Found {matches.Count} tokens in the {network} section");
+                // If no tokens found using list items, try direct paragraph content
+                if (tokens.Count == 0)
+                {
+                    string paragraphPattern = @"<p[^>]*>\s*([a-zA-Z0-9\s]+)\s*\(([A-Z0-9]+)\)\s*-\s*Contract\s+address:\s+(0x[a-fA-F0-9]+)";
+                    var paragraphMatches = Regex.Matches(sectionHtml, paragraphPattern, RegexOptions.Singleline);
+
+                    _logger.LogDebug($"Found {paragraphMatches.Count} paragraphs with token info in {network} section");
+
+                    foreach (Match match in paragraphMatches)
+                    {
+                        if (match.Groups.Count >= 4)
+                        {
+                            string name = match.Groups[1].Value.Trim();
+                            string symbol = match.Groups[2].Value.Trim();
+                            string contractAddress = match.Groups[3].Value.Trim();
+
+                            // Skip if already in our list
+                            if (tokens.Exists(t => t.Symbol == symbol && t.ContractAddress == contractAddress))
+                            {
+                                continue;
+                            }
+
+                            tokens.Add(new BlogToken
+                            {
+                                Name = name,
+                                Symbol = symbol,
+                                ContractAddress = contractAddress,
+                                Network = network,
+                                DiscoveredAt = DateTime.UtcNow
+                            });
+
+                            _logger.LogDebug($"Extracted token from paragraph: {name} ({symbol}) on {network}");
+                        }
+                    }
+                }
+
+                _logger.LogInformation($"Found {tokens.Count} tokens in the {network} section");
             }
             catch (Exception ex)
             {
@@ -178,37 +274,57 @@ namespace CryptoMonitor.Services.WebScraping.Parsers
         {
             try
             {
-                // Pattern for tokens anywhere in the document: "Name (SYMBOL) - Contract address: 0x..."
-                string pattern = @"([a-zA-Z0-9\s]+)\s*\(([A-Z0-9]+)\)\s*-\s*Contract\s*address:\s*(0x[a-fA-F0-9]+)";
+                _logger.LogInformation("Searching for tokens in the entire document");
 
-                MatchCollection matches = Regex.Matches(html, pattern);
+                // Look for list items across the entire document
+                string listItemPattern = @"<li[^>]*variant=""body""[^>]*display=""list-item""[^>]*>.*?<p[^>]*>([^<]+)</p>";
+                var listMatches = Regex.Matches(html, listItemPattern, RegexOptions.Singleline);
 
-                foreach (Match match in matches)
+                _logger.LogDebug($"Found {listMatches.Count} list items in the entire document");
+
+                foreach (Match match in listMatches)
                 {
-                    if (match.Groups.Count >= 4)
+                    if (match.Groups.Count >= 2)
                     {
-                        string name = match.Groups[1].Value.Trim();
-                        string symbol = match.Groups[2].Value.Trim();
-                        string contractAddress = match.Groups[3].Value.Trim();
+                        string content = match.Groups[1].Value;
 
-                        // Try to determine the network from the surrounding context
-                        string surroundingText = GetSurroundingText(html, match.Index, 300);
-                        string network = DetermineNetworkFromContext(surroundingText);
-
-                        tokens.Add(new BlogToken
+                        // Check if this content looks like a token entry
+                        if (content.Contains("Contract address:") && content.Contains("(") && content.Contains(")"))
                         {
-                            Name = name,
-                            Symbol = symbol,
-                            ContractAddress = contractAddress,
-                            Network = network,
-                            DiscoveredAt = DateTime.UtcNow
-                        });
+                            var tokenMatch = Regex.Match(content, @"([a-zA-Z0-9\s]+)\s*\(([A-Z0-9]+)\)\s*-\s*Contract\s+address:\s+(0x[a-fA-F0-9]+)");
 
-                        _logger.LogDebug($"Extracted token from document: {name} ({symbol}) on {network}");
+                            if (tokenMatch.Success && tokenMatch.Groups.Count >= 4)
+                            {
+                                string name = tokenMatch.Groups[1].Value.Trim();
+                                string symbol = tokenMatch.Groups[2].Value.Trim();
+                                string contractAddress = tokenMatch.Groups[3].Value.Trim();
+
+                                // Determine network from context
+                                string context = GetSurroundingText(html, match.Index, 1000);
+                                string network = DetermineNetworkFromContext(context);
+
+                                // Skip if already in our list
+                                if (tokens.Exists(t => t.Symbol == symbol && t.ContractAddress == contractAddress))
+                                {
+                                    continue;
+                                }
+
+                                tokens.Add(new BlogToken
+                                {
+                                    Name = name,
+                                    Symbol = symbol,
+                                    ContractAddress = contractAddress,
+                                    Network = network,
+                                    DiscoveredAt = DateTime.UtcNow
+                                });
+
+                                _logger.LogDebug($"Extracted token from document: {name} ({symbol}) on {network}");
+                            }
+                        }
                     }
                 }
 
-                _logger.LogInformation($"Found {matches.Count} tokens in the entire document");
+                _logger.LogInformation($"Found {tokens.Count} tokens in the entire document");
             }
             catch (Exception ex)
             {

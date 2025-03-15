@@ -14,8 +14,26 @@ namespace CryptoMonitor.Services.WebScraping
 
         public HttpClientService(HttpClient httpClient, ILogger<HttpClientService> logger)
         {
-            _httpClient = httpClient;
             _logger = logger;
+
+            // Configure handler with proxy support
+            var handler = new HttpClientHandler
+            {
+                // Configure proxy (uncomment and set your proxy URL when ready)
+                // Proxy = new WebProxy("http://proxy-service-url:port"),
+                // UseProxy = true,
+
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                AllowAutoRedirect = true,
+                UseCookies = true
+            };
+
+            // Initialize HttpClient with the handler
+            _httpClient = new HttpClient(handler);
+
+            // Set default headers
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+            _httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
         }
 
         public async Task<string> GetHtmlContentAsync(string url, int maxRetryAttempts = 5)
@@ -24,23 +42,36 @@ namespace CryptoMonitor.Services.WebScraping
 
             // Add a small random delay before starting to make the request pattern more human-like
             Random random = new Random();
-            await Task.Delay(random.Next(500, 1500));
+            await Task.Delay(random.Next(1000, 3000));
+
+            // Track if we've seen a 403 error
+            bool received403 = false;
 
             return await RetryUtility.ExecuteWithRetryAsync(async () =>
             {
+                // If we got a 403 on the previous attempt, wait longer and completely
+                // change our request signature
+                if (received403)
+                {
+                    // Much longer delay after a 403 (20-40 seconds)
+                    int recoveryDelay = random.Next(20000, 40000);
+                    _logger.LogInformation($"Applying special 403 recovery delay of {recoveryDelay}ms before retry");
+                    await Task.Delay(recoveryDelay);
+
+                    // Clear any cached DNS entries for the host
+                    ServicePointManager.DnsRefreshTimeout = 0;
+                }
+
                 var request = CreateBrowserLikeRequest(url);
 
-                // Handle compression manually if needed
-                // request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
-                // request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
-
-                var response = await _httpClient.SendWithRetryAsync(request, maxRetryAttempts: maxRetryAttempts, logger: _logger);
+                var response = await _httpClient.SendWithRetryAsync(request, maxRetryAttempts: 1, logger: _logger);
 
                 _logger.LogInformation($"Received response with status: {response.StatusCode}");
 
-                // Handle 403 Forbidden errors specifically
+                // Special handling for 403 Forbidden
                 if (response.StatusCode == HttpStatusCode.Forbidden)
                 {
+                    received403 = true;
                     _logger.LogWarning("Website is blocking our request with 403 Forbidden. This may indicate anti-scraping measures.");
                     throw new HttpRequestException($"Website is blocking our request: {response.StatusCode}");
                 }
@@ -51,14 +82,7 @@ namespace CryptoMonitor.Services.WebScraping
                 _logger.LogInformation($"Successfully fetched HTML content (length: {htmlContent.Length} bytes)");
 
                 return htmlContent;
-            }, maxRetryAttempts: maxRetryAttempts, logger: _logger,
-            // Custom retry delay function that adds jitter (randomness) to delays
-            retryDelayFunc: attempt =>
-            {
-                int baseDelay = (int)Math.Pow(2, attempt) * 500;
-                int jitter = random.Next(-200, 200);  // Add random jitter
-                return baseDelay + jitter;
-            });
+            }, maxRetryAttempts: maxRetryAttempts, logger: _logger);
         }
 
         private HttpRequestMessage CreateBrowserLikeRequest(string url)

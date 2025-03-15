@@ -70,27 +70,26 @@ namespace CryptoMonitor.Services.WebScraping
             }
         }
 
-        public async Task<(List<BlogToken> NewTokens, bool HtmlChanged)> CheckForChangesAsync(string url, string sourceName)
+        public async Task<(List<BlogToken> NewTokens, List<BlogToken> RemovedTokens)> CheckForChangesAsync(string url, string sourceName)
         {
             try
             {
-                var (currentTokens, htmlContent) = await MonitorPageAsync(url);
+                var (currentTokens, _) = await MonitorPageAsync(url);
 
-                if (string.IsNullOrEmpty(htmlContent))
+                if (currentTokens.Count == 0)
                 {
-                    return (new List<BlogToken>(), false);
+                    _logger.LogInformation($"No tokens found at {url}");
+                    return (new List<BlogToken>(), new List<BlogToken>());
                 }
 
                 // Get changes by comparing with previous data
-                var changes = await _blogRepository.GetChangesAsync(currentTokens, htmlContent, sourceName);
+                var changes = await _blogRepository.GetChangesAsync(currentTokens, sourceName);
 
-                if (changes.NewTokens.Count > 0 || changes.HtmlChanged)
+                if (changes.NewTokens.Count > 0 || changes.RemovedTokens.Count > 0)
                 {
                     // Save the current state
                     await _blogRepository.SaveTokensAsync(currentTokens, sourceName);
-                    await _blogRepository.SaveHtmlAsync(htmlContent, sourceName);
-
-                    _logger.LogInformation($"Changes detected for {sourceName}: {changes.NewTokens.Count} new tokens, HTML changed: {changes.HtmlChanged}");
+                    _logger.LogInformation($"Changes detected for {sourceName}: {changes.NewTokens.Count} new tokens, {changes.RemovedTokens.Count} removed tokens");
                 }
                 else
                 {
@@ -102,7 +101,7 @@ namespace CryptoMonitor.Services.WebScraping
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error checking for changes at {url}: {ex.Message}");
-                return (new List<BlogToken>(), false);
+                return (new List<BlogToken>(), new List<BlogToken>());
             }
         }
     }

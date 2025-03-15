@@ -62,28 +62,45 @@ namespace CryptoMonitor
                 {
                     _logger.LogInformation($"Monitoring page: {pageConfig.Name} ({pageConfig.Url})");
 
-                    var (newTokens, htmlChanged) = await _webPageMonitorService.CheckForChangesAsync(
+                    var (newTokens, removedTokens) = await _webPageMonitorService.CheckForChangesAsync(
                         pageConfig.Url,
                         pageConfig.Source);
 
-                    if (newTokens.Count > 0)
-                    {
-                        _logger.LogInformation($"Found {newTokens.Count} new tokens on {pageConfig.Name}!");
+                    bool hasChanges = newTokens.Count > 0 || removedTokens.Count > 0;
 
-                        // Send notifications for new tokens
-                        string subject = $"New tokens on {pageConfig.Name}! ({newTokens.Count})";
+                    if (hasChanges)
+                    {
+                        _logger.LogInformation($"Changes detected on {pageConfig.Name}!");
+
+                        if (newTokens.Count > 0)
+                        {
+                            _logger.LogInformation($"Found {newTokens.Count} new tokens on {pageConfig.Name}!");
+                        }
+
+                        if (removedTokens.Count > 0)
+                        {
+                            _logger.LogInformation($"Found {removedTokens.Count} tokens removed from {pageConfig.Name} (potentially listed)!");
+                        }
+
+                        // Send notifications for token changes
                         var notificationChannels = _notificationFactory.GetEnabledChannels();
 
                         foreach (var channel in notificationChannels)
                         {
-                            await channel.SendNotificationAsync(subject, newTokens, pageConfig.Source);
+                            if (newTokens.Count > 0)
+                            {
+                                string newSubject = $"New tokens on {pageConfig.Name}! ({newTokens.Count})";
+                                await channel.SendNotificationAsync(newSubject, newTokens, pageConfig.Source);
+                            }
+
+                            if (removedTokens.Count > 0)
+                            {
+                                string removedSubject = $"Tokens removed from {pageConfig.Name} roadmap! ({removedTokens.Count}) - Potentially Listed";
+                                await channel.SendNotificationAsync(removedSubject, removedTokens, pageConfig.Source);
+                            }
                         }
 
                         _logger.LogInformation($"Notifications sent for {pageConfig.Name}");
-                    }
-                    else if (htmlChanged)
-                    {
-                        _logger.LogInformation($"HTML content changed on {pageConfig.Name}, but no new tokens detected");
                     }
                     else
                     {

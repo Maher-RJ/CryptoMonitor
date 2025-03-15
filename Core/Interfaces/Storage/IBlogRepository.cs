@@ -10,12 +10,8 @@ namespace CryptoMonitor.Core.Interfaces.Storage
         Task<List<BlogToken>> GetPreviousTokensAsync(string source);
         Task SaveTokensAsync(List<BlogToken> tokens, string source);
 
-        Task<string> GetPreviousHtmlAsync(string source);
-        Task SaveHtmlAsync(string htmlContent, string source);
-
-        Task<(List<BlogToken> NewTokens, bool HtmlChanged)> GetChangesAsync(
+        Task<(List<BlogToken> NewTokens, List<BlogToken> RemovedTokens)> GetChangesAsync(
             List<BlogToken> currentTokens,
-            string currentHtml,
             string source);
     }
 }
