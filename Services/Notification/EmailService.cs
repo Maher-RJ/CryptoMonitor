@@ -7,6 +7,7 @@ using Azure.Communication.Email;
 using CryptoMonitor.Core.Interfaces.Notification;
 using CryptoMonitor.Core.Models.Coinbase;
 using CryptoMonitor.Core.Models.Common;
+using CryptoMonitor.Core.Models.Blog;
 using Microsoft.Extensions.Logging;
 
 namespace CryptoMonitor.Services.Notification
@@ -74,6 +75,24 @@ namespace CryptoMonitor.Services.Notification
                             bodyBuilder.AppendLine($"<tr>" +
                                 $"<td>{token.Id}</td>" +
                                 $"<td>{token.Symbol}</td>" +
+                                $"</tr>");
+                        }
+                    }
+                }
+                // Special handling for BlogToken model
+                else if (typeof(T) == typeof(BlogToken))
+                {
+                    bodyBuilder.AppendLine("<tr><th>Name</th><th>Symbol</th><th>Network</th><th>Contract Address</th></tr>");
+
+                    foreach (var item in items)
+                    {
+                        if (item is BlogToken token)
+                        {
+                            bodyBuilder.AppendLine($"<tr>" +
+                                $"<td>{token.Name}</td>" +
+                                $"<td>{token.Symbol}</td>" +
+                                $"<td>{token.Network}</td>" +
+                                $"<td>{token.ContractAddress}</td>" +
                                 $"</tr>");
                         }
                     }

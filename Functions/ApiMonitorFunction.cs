@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using CryptoMonitor.Core.Interfaces.Configuration;
 using CryptoMonitor.Core.Interfaces.DataSources;
+using CryptoMonitor.Core.Models.Common;
 using CryptoMonitor.Core.Interfaces.Storage;
 using CryptoMonitor.Services.Notification;
 using CryptoMonitor.Utilities.Comparison;
@@ -30,22 +31,35 @@ namespace CryptoMonitor
             _logger = loggerFactory.CreateLogger<ApiMonitorFunction>();
         }
 
-
         [Function("ApiMonitorFunction")]
-        public async Task Run([TimerTrigger("%TimerSchedule%")] TimerInfo timer)
+        public async Task Run([TimerTrigger("%ApiSchedule%")] TimerInfo timer)
         {
             var settings = _configProvider.GetSettings();
             string modeStatus = settings.TestMode ? "TEST MODE" : "PRODUCTION MODE";
             _logger.LogInformation($"Crypto API monitoring function executed at: {DateTime.Now} [{modeStatus}]");
 
+            // First check global API monitoring switch
+            if (!settings.ApiMonitoring.Enabled)
+            {
+                _logger.LogInformation("API monitoring is globally disabled. Skipping check.");
+                return;
+            }
+
             if (settings.TestMode)
             {
-                _logger.LogInformation("Running in TEST MODE with 1-minute intervals and test storage container");
+                _logger.LogInformation("Running in TEST MODE with test storage container");
             }
 
             try
             {
-                if (!settings.DataSources.Coinbase.Enabled || !settings.DataSources.Coinbase.ApiEnabled)
+                // Next check exchange-specific and API-specific switches
+                if (!settings.DataSources.Coinbase.Enabled)
+                {
+                    _logger.LogInformation("Coinbase monitoring is disabled. Skipping check.");
+                    return;
+                }
+
+                if (!settings.DataSources.Coinbase.ApiEnabled)
                 {
                     _logger.LogInformation("Coinbase API monitoring is disabled. Skipping check.");
                     return;
