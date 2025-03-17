@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.Functions.Worker;
@@ -7,6 +8,7 @@ using CryptoMonitor.Core.Interfaces.Configuration;
 using CryptoMonitor.Core.Interfaces.Notification;
 using CryptoMonitor.Core.Interfaces.Storage;
 using CryptoMonitor.Core.Interfaces.WebScraping;
+using CryptoMonitor.Configuration.Models;
 using CryptoMonitor.Services.Notification;
 using CryptoMonitor.Services.WebScraping;
 using CryptoMonitor.Services.WebScraping.Parsers;
@@ -56,7 +58,31 @@ namespace CryptoMonitor
 
             _logger.LogInformation($"Found {settings.WebScraping.Pages.Count} web pages configured for monitoring");
 
-            foreach (var pageConfig in settings.WebScraping.Pages.Where(p => p.Enabled))
+            // Get enabled pages
+            var enabledPages = settings.WebScraping.Pages.Where(p => p.Enabled).ToList();
+
+            // Filter out pages from disabled data sources
+            var filteredPages = new List<WebPageConfig>();
+            foreach (var page in enabledPages)
+            {
+                if (page.Source.Contains("Coinbase") && !settings.DataSources.Coinbase.Enabled)
+                {
+                    _logger.LogInformation($"Skipping {page.Name} because Coinbase monitoring is disabled");
+                    continue;
+                }
+
+                if (page.Source.Contains("Robinhood") && !settings.DataSources.Robinhood.Enabled)
+                {
+                    _logger.LogInformation($"Skipping {page.Name} because Robinhood monitoring is disabled");
+                    continue;
+                }
+
+                filteredPages.Add(page);
+            }
+
+            _logger.LogInformation($"Found {filteredPages.Count} enabled web pages for monitoring after source filtering");
+
+            foreach (var pageConfig in filteredPages)
             {
                 try
                 {

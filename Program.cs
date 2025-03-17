@@ -39,6 +39,7 @@ var host = new HostBuilder()
         services.AddSingleton<HttpClientService>();
         services.AddSingleton<WebPageMonitorService>();
         services.AddSingleton<IPageParser, CoinbaseRoadmapParser>();
+        services.AddSingleton<IPageParser, RobinhoodListingParser>();
         services.AddSingleton<ParserFactory>();
 
         // Register storage for web scraping results

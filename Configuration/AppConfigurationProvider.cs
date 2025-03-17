@@ -40,10 +40,6 @@ namespace CryptoMonitor.Configuration
                 settings.ApiMonitoring.Enabled = GetBoolSetting("ApiMonitoringEnabled", true);
                 _logger.LogInformation($"API monitoring configured: Enabled={settings.ApiMonitoring.Enabled}");
 
-                // Global blog monitoring settings
-                settings.BlogMonitoring.Enabled = GetBoolSetting("BlogMonitoringEnabled", true);
-                _logger.LogInformation($"Blog monitoring configured: Enabled={settings.BlogMonitoring.Enabled}");
-
                 // Web scraping settings
                 settings.WebScraping.Enabled = GetBoolSetting("WebScrapingEnabled", true);
                 LoadWebScrapingPages(settings.WebScraping);
