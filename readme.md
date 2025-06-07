@@ -2,7 +2,7 @@
 
 CryptoMonitor is an Azure Functions application designed to track new cryptocurrency token listings and roadmap updates across various exchange sources. It allows traders to receive early notifications about new crypto assets, potentially providing a competitive advantage for trading opportunities.
 
-## 🚀 Key Features
+## Key Features
 
 - **Real-time Exchange API Monitoring**: Tracks Coinbase API for new token listings
 - **Web Scraping**: Monitors exchange roadmaps and blogs for upcoming token listings
@@ -10,7 +10,7 @@ CryptoMonitor is an Azure Functions application designed to track new cryptocurr
 - **Flexible Notifications**: Email notifications when changes are detected
 - **Multi-Exchange Support**: Architecture ready for multiple data sources (currently focusing on Coinbase)
 
-## 🏗️ Architecture
+## Architecture
 
 CryptoMonitor is built using Azure Functions with a modular, interface-based architecture:
 
@@ -19,14 +19,14 @@ CryptoMonitor is built using Azure Functions with a modular, interface-based arc
 - **Storage**: Uses Azure Blob Storage to track token state and detect changes
 - **Notifications**: Sends email alerts when changes are detected
 
-## 📋 Prerequisites
+## Prerequisites
 
 - .NET 8.0 SDK
 - Azure subscription
 - Azure Communication Services account (for email notifications)
 - Azure Blob Storage account
 
-## ⚙️ Configuration
+## Configuration
 
 Configuration is managed through Azure Function app settings or local.settings.json for development:
 
@@ -77,7 +77,7 @@ Configuration is managed through Azure Function app settings or local.settings.j
 }
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Azure Deployment
 
@@ -91,7 +91,7 @@ Configuration is managed through Azure Function app settings or local.settings.j
 2. Create a `local.settings.json` file with the settings described above
 3. Run `func start` using the Azure Functions Core Tools
 
-## 📝 Usage
+## Usage
 
 Once deployed, CryptoMonitor runs automatically based on the configured schedules:
 
@@ -100,7 +100,7 @@ Once deployed, CryptoMonitor runs automatically based on the configured schedule
 
 When new tokens are detected (or tokens are removed from roadmaps), email notifications are sent to the configured recipient.
 
-## 🧩 Extending the System
+## Extending the System
 
 ### Adding New Data Sources
 
@@ -114,17 +114,17 @@ When new tokens are detected (or tokens are removed from roadmaps), email notifi
 1. Implement `INotificationChannel` for your new notification method
 2. Register in the `NotificationFactory`
 
-## 🔒 Security Notes
+## Security Notes
 
 - Store sensitive configuration (connection strings, API keys) using proper Azure Functions app settings
 - Use managed identities where possible for accessing Azure resources
 - The web scraping code includes anti-bot protection measures to avoid request blocking
 
-## 👥 Authors
+## Authors
 
 - **Maher Jabbar**
 - **ChatGPT**
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
